@@ -40,7 +40,8 @@ typedef struct t_socket {
     void (*Listen)(int Port);
 
     /// @brief Attende in maniera sincrona una connessione al socket da parte di un client.
-    void (*WaitForConnection)();
+    /// @return L'indirizzo IP del client che si è appena connesso
+    char* (*WaitForConnection)();
 
     /// @brief Legge una stringa in input sul socket.
     /// @return La stringa letta, accessibile anche tramite .Buffer
@@ -62,12 +63,12 @@ typedef struct t_socket {
 /// @param bufferlen Lunghezza del buffer in ricezione.
 #define NEW_SOCKET(this, bufferlen) \
 Socket this;\
-void INIT_##name() {\
+void INIT_##this() {\
     WSADATA wsaData;\
     WSAStartup(MAKEWORD(2,2), &wsaData);\
     this.Buffer = (char*)malloc(bufferlen);\
 };\
-void LISTEN_##name(int port_number) {\
+void LISTEN_##this(int port_number) {\
     struct addrinfo* result = NULL;\
     struct addrinfo hints = {AI_PASSIVE, AF_INET, SOCK_STREAM, IPPROTO_TCP};\
     char portbf[6] = "";\
@@ -79,29 +80,32 @@ void LISTEN_##name(int port_number) {\
     freeaddrinfo(result);\
     listen(this.ListenSocket, SOMAXCONN);\
 };\
-void WAITFORCONNECTION_##name() {\
-    this.ClientSocket = accept(this.ListenSocket, NULL, NULL);\
+char* WAITFORCONNECTION_##this() {\
+    SOCKADDR_IN addr;   \
+    int addrlen = sizeof(addr);\
+    this.ClientSocket = accept(this.ListenSocket, (SOCKADDR*)&addr, &addrlen);\
+    return inet_ntoa(addr.sin_addr);\
 }\
-char* READ_##name() {\
+char* READ_##this() {\
     int l = recv(this.ClientSocket, this.Buffer, bufferlen, 0);\
     this.Buffer[l] = 0;\
     if(l <= 0) return 0;\
     return this.Buffer;\
 }\
-void WRITE_##name(const char* str) {\
+void WRITE_##this(const char* str) {\
     send(this.ClientSocket, str, strlen(str), 0);\
 }\
-void CLOSE_##name() {\
+void CLOSE_##this() {\
     closesocket(this.ClientSocket);\
 }\
 Socket this = {\
     NULL,\
-    INIT_##name,\
-    LISTEN_##name,\
-    WAITFORCONNECTION_##name,\
-    READ_##name,\
-    WRITE_##name,\
-    CLOSE_##name,\
+    INIT_##this,\
+    LISTEN_##this,\
+    WAITFORCONNECTION_##this,\
+    READ_##this,\
+    WRITE_##this,\
+    CLOSE_##this,\
     INVALID_SOCKET,\
     INVALID_SOCKET,\
 };\
